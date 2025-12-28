@@ -17,19 +17,20 @@ NUM_LEDS = 48
 # --- PIXEL MAPPING ---
 # 0-indexed LED numbers for each point.
 # You must fill in the rest of these lists for your specific matrix layout!
-WILD_PIXELS = {
-    1: [0, 1, 6, 7],      # Point 1
-    2: [8,9,14,15],                # Point 2 (Add your pixel IDs here)
-    3: [16,17,22,23],                # Point 3
-    # ... add more points
-}
+# Define the first point for each team manually
+wild_base = [0, 1, 6, 7]
+opp_base  = [2, 3, 4, 5]
 
-OPP_PIXELS = {
-    1: [2, 3, 4, 5],      # Point 1
-    2: [10,11,12,13],                # Point 2
-    3: [18,19,20,21],                # Point 3
-    # ... add more points
-}
+# Initialize the dictionaries with Point 1
+WILD_PIXELS = {1: wild_base}
+OPP_PIXELS  = {1: opp_base}
+
+# Automatically generate Points 2 through 6
+# Logic: Each new point is exactly 8 pixels further down the strip
+for i in range(2, 7):
+    # List comprehension: Take the previous point's pixels and add 8 to each
+    WILD_PIXELS[i] = [p + 8 for p in WILD_PIXELS[i-1]]
+    OPP_PIXELS[i]  = [p + 8 for p in OPP_PIXELS[i-1]]
 
 # --- HARDWARE SETUP ---
 relay = machine.Pin(RELAY_PIN, machine.Pin.OUT)
@@ -126,6 +127,7 @@ def trigger_goal(is_wild_goal):
     
     # Start Sound (in a non-blocking way if possible, but blocking is fine here)
     if buzzer: play_horn()
+    else: print("No buzzer")
 
     # Visual Celebration (10 seconds)
     # Pulse effect
@@ -284,6 +286,14 @@ while True:
         manual_set_score(1,1)
         time.sleep(15)
         manual_set_score(2,1)
+        time.sleep(5)
+        manual_set_score(3,1)
+        
+        manual_set_score(4,1)
+        
+        manual_set_score(5,1)
+        
+        manual_set_score(6,1)
         time.sleep(20)
         
     except KeyboardInterrupt:
