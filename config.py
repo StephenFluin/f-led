@@ -11,7 +11,6 @@ DEFAULT_CONFIG = {
     "device": {
         "team_abbrev": "MIN",
         "poll_interval": constants.DEFAULT_POLL_INTERVAL,
-        "num_leds": constants.DEFAULT_NUM_LEDS,
         "brightness": constants.DEFAULT_BRIGHTNESS,
     },
 }

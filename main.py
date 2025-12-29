@@ -15,14 +15,18 @@ POLL_INTERVAL = config.get("device", {}).get(
 BRIGHTNESS = config.get("device", {}).get(
     "brightness", constants.DEFAULT_BRIGHTNESS
 )  # 0-100 scale
-NUM_LEDS = config.get("device", {}).get("num_leds", constants.DEFAULT_NUM_LEDS)
 
 # --- PIXEL MAPPING ---
 # 0-indexed LED numbers for each point.
 # You must fill in the rest of these lists for your specific matrix layout!
 # Define the first point for each team manually
-wild_base = [0, 1, 6, 7, 48, 49, 50, 51]
-opp_base = [2, 3, 4, 5, 50, 51, 52, 53]
+## Single panel
+# wild_base = [0, 1, 6, 7]
+# opp_base = [2, 3, 4, 5]
+
+## Dual Panel
+wild_base = [0, 1, 2, 3, 4, 5, 6, 7]
+opp_base = [48, 49, 50, 51, 52, 53, 54, 55]
 
 # Initialize the dictionaries with Point 1
 WILD_PIXELS = {1: wild_base}
@@ -40,7 +44,7 @@ relay = machine.Pin(constants.RELAY_PIN, machine.Pin.OUT)
 relay.on()
 time.sleep(0.5)
 
-np = neopixel.NeoPixel(machine.Pin(constants.DATA_PIN), NUM_LEDS)
+np = neopixel.NeoPixel(machine.Pin(constants.DATA_PIN), constants.NUM_LEDS)
 
 # Attempt to init buzzer (fails safely if not connected)
 buzzer = None
@@ -135,14 +139,14 @@ def draw_scoreboard():
     for i in range(1, current_wild_score + 1):
         pixels = WILD_PIXELS.get(i, [])
         for p in pixels:
-            if p < NUM_LEDS:
+            if p < constants.NUM_LEDS:
                 np[p] = green
 
     # Draw Opponent Points (Red)
     for i in range(1, current_opp_score + 1):
         pixels = OPP_PIXELS.get(i, [])
         for p in pixels:
-            if p < NUM_LEDS:
+            if p < constants.NUM_LEDS:
                 np[p] = red
 
     np.write()

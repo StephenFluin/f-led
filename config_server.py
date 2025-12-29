@@ -41,7 +41,6 @@ class ConfigServer:
         hostname = config.get("wifi", {}).get("hostname", "wildsensor")
         team = config.get("device", {}).get("team_abbrev", "MIN")
         poll = config.get("device", {}).get("poll_interval", 10)
-        leds = config.get("device", {}).get("num_leds", 48)
         brightness = config.get("device", {}).get("brightness", 50)
         device_code = get_device_code()
 
@@ -54,7 +53,6 @@ class ConfigServer:
             HOSTNAME=hostname,
             TEAM=team,
             POLL=poll,
-            LEDS=leds,
             BRIGHTNESS=brightness,
         )
 
@@ -73,7 +71,6 @@ class ConfigServer:
                 config["device"] = {}
             config["device"]["team_abbrev"] = params.get("team", "MIN").upper()
             config["device"]["poll_interval"] = int(params.get("poll", 10))
-            config["device"]["num_leds"] = int(params.get("leds", 48))
             config["device"]["brightness"] = int(params.get("brightness", 50))
 
             save_config(config)

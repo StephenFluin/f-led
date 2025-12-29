@@ -26,16 +26,14 @@ class WiFiManager:
     def __init__(self):
         self.wlan_sta = network.WLAN(network.STA_IF)
         self.wlan_ap = network.WLAN(network.AP_IF)
-        self.np = neopixel.NeoPixel(
-            machine.Pin(constants.DATA_PIN), constants.DEFAULT_NUM_LEDS
-        )
+        self.np = neopixel.NeoPixel(machine.Pin(constants.DATA_PIN), constants.NUM_LEDS)
         self.connected = False
 
     def show_loading_spinner(self, position):
         """Show blue loading spinner at 5% brightness"""
         self.np.fill((0, 0, 0))
         # Show current LED in blue
-        if position < constants.DEFAULT_NUM_LEDS:
+        if position < constants.NUM_LEDS:
             self.np[position] = (0, 0, constants.LOADING_BRIGHTNESS_VALUE)
         self.np.write()
 
@@ -81,7 +79,7 @@ class WiFiManager:
 
             # Update loading spinner
             self.show_loading_spinner(led_position)
-            led_position = (led_position + 1) % constants.DEFAULT_NUM_LEDS
+            led_position = (led_position + 1) % constants.NUM_LEDS
 
             max_wait -= 1
             time.sleep(constants.WIFI_CHECK_INTERVAL_SEC)
