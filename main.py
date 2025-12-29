@@ -15,10 +15,10 @@ POLL_INTERVAL = config.get("device", {}).get(
 BRIGHTNESS = config.get("device", {}).get(
     "brightness", constants.DEFAULT_BRIGHTNESS
 )  # 0-100 scale
+NUM_LEDS = constants.NUM_LEDS
 
 # --- PIXEL MAPPING ---
 # 0-indexed LED numbers for each point.
-# You must fill in the rest of these lists for your specific matrix layout!
 # Define the first point for each team manually
 ## Single panel
 # wild_base = [0, 1, 6, 7]
