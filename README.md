@@ -8,8 +8,11 @@ A network-connected ESP32 device that monitors sports API endpoints and displays
 - **Access Point Fallback**: Automatically creates a WiFi hotspot when unable to connect
 - **Loading Indicator**: Blue LED spinner at 5% brightness during WiFi connection
 - **Persistent Configuration**: Saves WiFi credentials and settings to device storage
+- **Runtime Configuration Server**: Web interface available on port 8080 when connected to WiFi
 - **Live Score Display**: Shows current game score on LED matrix
 - **Goal Celebrations**: Visual and audio effects when goals are scored
+- **Power Button Sleep Mode**: Press button to turn off LEDs and disconnect WiFi to save power
+- **Configurable Brightness**: Adjust LED brightness from 0-100% via web interface
 
 ## Initial Setup
 
@@ -42,11 +45,44 @@ A network-connected ESP32 device that monitors sports API endpoints and displays
 
 ### Reconfiguration
 
-If you need to change WiFi settings:
+If you need to change WiFi settings or device configuration:
+
+**Option 1: Web Interface (Recommended)**
+
+1. Find your device's IP address (check your router or console output)
+2. Open browser to: `http://[device-ip]:8080`
+3. Adjust settings as needed
+4. Click "Save & Restart"
+
+**Option 2: Force AP Mode**
 
 1. Delete the `config.json` file from the device, or
 2. Set WiFi credentials that won't connect to trigger AP mode
 3. Follow the initial setup steps above
+
+## Runtime Configuration
+
+When the device successfully connects to WiFi, a web-based configuration server automatically starts on **port 8080**.
+
+**Access the Configuration Interface:**
+
+- URL: `http://[device-ip]:8080`
+- The IP address is displayed in the console output during boot
+- Check your router's connected devices list if needed
+
+**Available Settings:**
+
+- WiFi credentials (SSID, password, hostname)
+- Team abbreviation
+- API poll interval
+- Number of LEDs
+- LED brightness (0-100%)
+
+**Changes take effect after:**
+
+- Click "Save & Restart"
+- Device will restart and apply new settings
+- No need to enter AP mode for configuration changes
 
 ## LED Indicators
 
@@ -72,7 +108,8 @@ Stores device configuration including:
   "device": {
     "team_abbrev": "MIN",
     "poll_interval": 10,
-    "num_leds": 48
+    "num_leds": 48,
+    "brightness": 50
   }
 }
 ```
@@ -93,13 +130,29 @@ Caches the last known score to maintain state across reboots.
 - **DATA_PIN**: 16 (LED data)
 - **RELAY_PIN**: 12 (Relay control)
 - **BUZZER_PIN**: 25 (Buzzer PWM)
+- **POWER_BUTTON_PIN**: 0 (Power sleep/wake button - GPIO 0/Boot button)
 
 ## Files
 
-- `boot.py`: Handles WiFi connection on startup
+### Python Modules
+
+- `boot.py`: Handles WiFi connection on startup and starts config server
 - `main.py`: Main application logic for score monitoring and LED control
 - `wifi_manager.py`: WiFi management with AP fallback and web server
 - `config.py`: Configuration file management
+- `config_server.py`: Runtime configuration web server (port 8080)
+- `power_manager.py`: Power button handling and sleep mode
+- `template_loader.py`: HTML template loading and rendering
+
+### HTML Templates
+
+- `www/wifi_config.html`: WiFi configuration page (AP mode)
+- `www/wifi_saved.html`: Success page after WiFi settings saved
+- `www/device_config.html`: Full device configuration page (runtime)
+- `www/device_saved.html`: Success page after device settings saved
+
+### Configuration
+
 - `config.json`: Device configuration (created on first setup)
 
 ## API
@@ -139,6 +192,13 @@ To modify the code:
 - Check LED strip connections
 - Verify DATA_PIN (16) is correct for your hardware
 - Check power supply to LED strip
+- Device may be in sleep mode - press power button to wake
+
+**Device won't wake from sleep**
+
+- Try pressing and holding power button for 1 second
+- Power cycle the device (unplug and plug back in)
+- Check that GPIO 0 button is properly connected
 
 ## License
 

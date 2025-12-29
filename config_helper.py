@@ -13,6 +13,7 @@ def create_config_file(
     team_abbrev="MIN",
     poll_interval=10,
     num_leds=48,
+    brightness=50,
 ):
     """Create a new configuration file"""
 
@@ -22,6 +23,7 @@ def create_config_file(
             "team_abbrev": team_abbrev,
             "poll_interval": poll_interval,
             "num_leds": num_leds,
+            "brightness": brightness,
         },
     }
 
@@ -46,7 +48,12 @@ def update_wifi(ssid, password, hostname="wildsensor"):
         except:
             config = {
                 "wifi": {},
-                "device": {"team_abbrev": "MIN", "poll_interval": 10, "num_leds": 48},
+                "device": {
+                    "team_abbrev": "MIN",
+                    "poll_interval": 10,
+                    "num_leds": 48,
+                    "brightness": 50,
+                },
             }
 
         # Update WiFi settings
@@ -83,6 +90,29 @@ def update_team(team_abbrev):
         return False
 
 
+def update_brightness(brightness):
+    """Update the LED brightness (0-100)"""
+    try:
+        with open("config.json", "r") as f:
+            config = json.load(f)
+
+        if "device" not in config:
+            config["device"] = {}
+
+        # Clamp brightness to 0-100
+        brightness = max(0, min(100, int(brightness)))
+        config["device"]["brightness"] = brightness
+
+        with open("config.json", "w") as f:
+            json.dump(config, f)
+
+        print(f"Brightness updated to: {brightness}%")
+        return True
+    except Exception as e:
+        print(f"Error updating brightness: {e}")
+        return False
+
+
 def show_config():
     """Display current configuration"""
     try:
@@ -95,7 +125,8 @@ def show_config():
 
 
 # Example usage (uncomment to use):
-# create_config_file(ssid="MyWiFi", password="MyPassword")
+# create_config_file(ssid="MyWiFi", password="MyPassword", brightness=75)
 # update_wifi("NewNetwork", "NewPassword")
 # update_team("CHI")  # Change to Chicago
+# update_brightness(80)  # Set to 80% brightness
 # show_config()

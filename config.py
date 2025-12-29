@@ -4,19 +4,23 @@ Handles loading/saving WiFi credentials and other settings to a JSON file
 """
 
 import json
-
-CONFIG_FILE = "config.json"
+import constants
 
 DEFAULT_CONFIG = {
     "wifi": {"ssid": "", "password": "", "hostname": "wildsensor"},
-    "device": {"team_abbrev": "MIN", "poll_interval": 10, "num_leds": 48},
+    "device": {
+        "team_abbrev": "MIN",
+        "poll_interval": constants.DEFAULT_POLL_INTERVAL,
+        "num_leds": constants.DEFAULT_NUM_LEDS,
+        "brightness": constants.DEFAULT_BRIGHTNESS,
+    },
 }
 
 
 def load_config():
     """Load configuration from file, return defaults if not found"""
     try:
-        with open(CONFIG_FILE, "r") as f:
+        with open(constants.CONFIG_FILE, "r") as f:
             config = json.load(f)
             print("Configuration loaded successfully")
             return config
@@ -31,7 +35,7 @@ def load_config():
 def save_config(config):
     """Save configuration to file"""
     try:
-        with open(CONFIG_FILE, "w") as f:
+        with open(constants.CONFIG_FILE, "w") as f:
             json.dump(config, f)
             print("Configuration saved successfully")
         return True
