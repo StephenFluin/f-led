@@ -2,17 +2,19 @@ import urequests
 import time
 import machine, neopixel
 import gc
+from config import load_config
 
 # --- CONFIGURATION ---
-TEAM_ABBREV = "MIN"
-POLL_INTERVAL = 10
+config = load_config()
+TEAM_ABBREV = config.get("device", {}).get("team_abbrev", "MIN")
+POLL_INTERVAL = config.get("device", {}).get("poll_interval", 10)
 CACHE_FILE = "score.txt"
 
 # Dig2Go Hardware
 RELAY_PIN = 12
 DATA_PIN = 16
 BUZZER_PIN = 25 
-NUM_LEDS = 48
+NUM_LEDS = config.get("device", {}).get("num_leds", 48)
 
 # --- PIXEL MAPPING ---
 # 0-indexed LED numbers for each point.
