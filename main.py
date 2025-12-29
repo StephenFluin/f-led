@@ -21,8 +21,8 @@ NUM_LEDS = config.get("device", {}).get("num_leds", constants.DEFAULT_NUM_LEDS)
 # 0-indexed LED numbers for each point.
 # You must fill in the rest of these lists for your specific matrix layout!
 # Define the first point for each team manually
-wild_base = [0, 1, 6, 7]
-opp_base = [2, 3, 4, 5]
+wild_base = [0, 1, 6, 7, 48, 49, 50, 51]
+opp_base = [2, 3, 4, 5, 50, 51, 52, 53]
 
 # Initialize the dictionaries with Point 1
 WILD_PIXELS = {1: wild_base}

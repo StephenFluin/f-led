@@ -10,7 +10,7 @@ BUZZER_PIN = 25
 POWER_BUTTON_PIN = 0  # GPIO 0 (common boot button on ESP32)
 
 # LED Configuration
-DEFAULT_NUM_LEDS = 48
+DEFAULT_NUM_LEDS = 96
 
 # Brightness Constants (0-100 scale)
 DEFAULT_BRIGHTNESS = 50
