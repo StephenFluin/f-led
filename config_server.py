@@ -113,7 +113,15 @@ class ConfigServer:
     def serve(self):
         """Start the web server"""
         addr = socket.getaddrinfo("0.0.0.0", self.port)[0][-1]
-        s = socket.socket()
+        try:
+            s = socket.socket()
+        except Exception as e:
+            if e == OSError(23):
+                print(
+                    "Socket error: Too many open socket connections. Reboot and try again."
+                )
+            print(f"Socket error: {e}")
+            return
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind(addr)
         s.listen(1)

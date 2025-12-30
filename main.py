@@ -230,15 +230,22 @@ def manual_set_score(wild, opp):
     print("Scoreboard updated.")
 
 
-# --- NETWORK LOGIC (Simplified for readability) ---
 def check_network_score():
     """
-    Memory-safe function to find the score.
+    Memory-safe function to find both team scores.
     Streams the data instead of loading it all at once.
+    Returns a tuple: (our_team_score, opponent_score)
+    Returns (-1, -1) on network error
+    Returns (-2, -2) if team not found
     """
     url = "https://api-web.nhle.com/v1/score/now"
-    score = -1
-    found_team = False
+    print(f"\nChecking {url} for score updates...")
+
+    # Track data for current game being parsed
+    away_team_abbrev = None
+    away_team_score = None
+    home_team_abbrev = None
+    home_team_score = None
 
     # 1. Force cleanup before starting the heavy network op
     gc.collect()
@@ -250,10 +257,10 @@ def check_network_score():
 
         # We will keep a "rolling window" of text to search through
         buffer = ""
-        found_target = False
 
         # Read the stream in small chunks
         while True:
+            print("Processing stream chunk")
             chunk = response.raw.read(constants.NETWORK_CHUNK_SIZE)
             if not chunk:
                 break
@@ -269,58 +276,114 @@ def check_network_score():
             if len(buffer) > constants.NETWORK_BUFFER_SIZE:
                 buffer = buffer[-constants.NETWORK_BUFFER_SIZE :]
 
+            # print(f"Checking buffer {buffer}.")
+
             # SEARCH LOGIC:
-            # We look for our team. The JSON structure usually puts "abbrev"
-            # and "score" close together in the same object.
-            # Example: {"abbrev":"MIN", "score":2, ...}
+            # Look for awayTeam section
+            if '"awayTeam"' in buffer and away_team_abbrev is None:
+                print("Found awayTeam section")
+                away_idx = buffer.find('"awayTeam"')
+                away_section = buffer[away_idx : away_idx + 400]
 
-            if f'"abbrev":"{TEAM_ABBREV}"' in buffer:
-                # We found the Wild! Now look for the score in this same window.
-                # We look for the pattern "score":X
+                # Extract abbrev
+                if '"abbrev":"' in away_section:
+                    abbrev_idx = away_section.find('"abbrev":"')
+                    abbrev_start = abbrev_idx + len('"abbrev":"')
+                    abbrev_end = away_section.find('"', abbrev_start)
+                    away_team_abbrev = away_section[abbrev_start:abbrev_end]
 
-                # Simple string parsing to find "score": followed by a number
-                try:
-                    # Find the position of "abbrev":"MIN"
-                    team_idx = buffer.find(f'"abbrev":"{TEAM_ABBREV}"')
+                # Extract score
+                if '"score":' in away_section:
+                    score_idx = away_section.find('"score":')
+                    score_part = away_section[score_idx + len('"score":') :]
+                    score_str = ""
+                    for char in score_part:
+                        if char.isdigit():
+                            score_str += char
+                        else:
+                            break
+                    if score_str:
+                        away_team_score = int(score_str)
+            # else:
+            # print(
+            #    f"could not find away team data and score in {buffer} and away_team_abbrev is {away_team_abbrev}"
+            # )
 
-                    # Look at the text AROUND the team name (before and after)
-                    # The score is usually a sibling key
-                    snippet = buffer[:]
+            # Look for homeTeam section
+            if '"homeTeam"' in buffer and home_team_abbrev is None:
+                print("Found homeTeam section")
 
-                    if '"score":' in snippet:
-                        # Extract the number after "score":
-                        parts = snippet.split('"score":')
-                        # The number is at the start of the second part
-                        # e.g., parts[1] starts with "2, ..." or "2}"
-                        score_part = parts[1]
+                home_idx = buffer.find('"homeTeam"')
+                home_section = buffer[home_idx : home_idx + 400]
 
-                        # Grab digits until we hit a comma or bracket
-                        score_str = ""
-                        for char in score_part:
-                            if char.isdigit():
-                                score_str += char
-                            else:
-                                break
+                # Extract abbrev
+                if '"abbrev":"' in home_section:
+                    abbrev_idx = home_section.find('"abbrev":"')
+                    abbrev_start = abbrev_idx + len('"abbrev":"')
+                    abbrev_end = home_section.find('"', abbrev_start)
+                    home_team_abbrev = home_section[abbrev_start:abbrev_end]
 
-                        if score_str:
-                            score = int(score_str)
-                            found_team = True
-                            break  # Stop reading the stream, we got it!
-                except Exception as e:
-                    print(f"Parsing error: {e}")
+                # Extract score
+                if '"score":' in home_section:
+                    score_idx = home_section.find('"score":')
+                    score_part = home_section[score_idx + len('"score":') :]
+                    score_str = ""
+                    for char in score_part:
+                        if char.isdigit():
+                            score_str += char
+                        else:
+                            break
+                    if score_str:
+                        home_team_score = int(score_str)
+
+            # Check if we've reached the end of a game object ("}]}")
+            # This indicates we have all the data for this game
+            if "}]}" in buffer:
+                # Once we have both teams, check if one is our team
+                if (
+                    away_team_abbrev
+                    and home_team_abbrev
+                    and away_team_score is not None
+                    and home_team_score is not None
+                ):
+                    if away_team_abbrev == TEAM_ABBREV:
+                        # We're the away team
+                        print(
+                            f"Found {TEAM_ABBREV} as away team: {away_team_score}-{home_team_score}"
+                        )
+                        response.close()
+                        return (away_team_score, home_team_score)
+                    elif home_team_abbrev == TEAM_ABBREV:
+                        # We're the home team
+                        print(
+                            f"Found {TEAM_ABBREV} as home team: {home_team_score}-{away_team_score}"
+                        )
+                        response.close()
+                        return (home_team_score, away_team_score)
+                    else:
+                        # This game doesn't involve our team
+                        print(
+                            f"Found game: {away_team_abbrev} vs {home_team_abbrev} - not {TEAM_ABBREV}, continuing..."
+                        )
+
+                # Reset for next game - clear buffer and variables
+                end_game_idx = buffer.find("}]}")
+                if end_game_idx != -1:
+                    buffer = buffer[end_game_idx + 3 :]  # Skip past "}]}"
+
+                away_team_abbrev = None
+                away_team_score = None
+                home_team_abbrev = None
+                home_team_score = None
 
         response.close()
 
     except Exception as e:
         print(f"Network error: {e}")
-        return -1
+        return (-1, -1)
 
-    if found_team:
-        return score
-    else:
-        # If we went through the whole stream and didn't find MIN,
-        # they probably aren't playing today.
-        return -2
+    # If we went through the whole stream and didn't find our team
+    return (-2, -2)
 
     pass
 
@@ -345,32 +408,59 @@ while True:
 
         # Skip normal operations if sleeping
         if power_mgr.is_sleeping:
-            time.sleep(0.1)  # Small sleep to reduce CPU usage
+            time.sleep(1)  # Small sleep to reduce CPU usage
             continue
 
-        # Normal operation continues below...
-        # 1. Listen for User Input via Thonny Shell
-        # In Thonny, you can type "manual_set_score(1,0)" in the shell
-        # while this loop is sleeping!
+        debug_mode = False
+        if not debug_mode:
+            # --- NORMAL OPERATION: Check Network for Score Updates ---
+            new_wild_score, new_opp_score = check_network_score()
+            if new_wild_score == -1:
+                print("Network error occurred, skipping this check.")
+            elif new_wild_score == -2:
+                print("Team not found in data (not playing?), skipping.")
+            else:
+                print(
+                    f"Retrieved scores: {TEAM_ABBREV} {new_wild_score} - {new_opp_score} OPP"
+                )
 
-        # 2. Run Network Check
-        manual_set_score(0, 0)
-        time.sleep(5)
-        manual_set_score(1, 0)
+                if new_wild_score > current_wild_score:
+                    trigger_goal(is_wild_goal=True)
+                    current_wild_score = new_wild_score
+                    current_opp_score = new_opp_score
+                    save_cache()
+                    draw_scoreboard()
+                elif new_opp_score > current_opp_score:
+                    trigger_goal(is_wild_goal=False)
+                    current_wild_score = new_wild_score
+                    current_opp_score = new_opp_score
+                    save_cache()
+                    draw_scoreboard()
+                else:
+                    print("No score change detected.")
 
-        time.sleep(15)  # Short sleep to allow Shell interrupts
-        manual_set_score(1, 1)
-        time.sleep(15)
-        manual_set_score(2, 1)
-        time.sleep(5)
-        manual_set_score(3, 1)
+            print(f"Waiting {POLL_INTERVAL} seconds until next check...")
+            time.sleep(POLL_INTERVAL)
+            continue
+        else:
+            # Testing with manual offline scores
+            manual_set_score(0, 0)
+            time.sleep(5)
+            manual_set_score(1, 0)
 
-        manual_set_score(4, 1)
+            time.sleep(15)
+            manual_set_score(1, 1)
+            time.sleep(15)
+            manual_set_score(2, 1)
+            time.sleep(5)
+            manual_set_score(3, 1)
 
-        manual_set_score(5, 1)
+            manual_set_score(4, 1)
 
-        manual_set_score(6, 1)
-        time.sleep(20)
+            manual_set_score(5, 1)
+
+            manual_set_score(6, 1)
+            time.sleep(20)
 
     except KeyboardInterrupt:
         print("\nShutting down...")
