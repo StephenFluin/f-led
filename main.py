@@ -2,6 +2,7 @@ import urequests
 import time
 import machine, neopixel
 import gc
+import network
 from config import load_config
 from power_manager import create_power_manager
 import constants
@@ -16,6 +17,11 @@ BRIGHTNESS = config.get("device", {}).get(
     "brightness", constants.DEFAULT_BRIGHTNESS
 )  # 0-100 scale
 NUM_LEDS = constants.NUM_LEDS
+
+# Get device identifiers for logging
+wlan = network.WLAN(network.STA_IF)
+DEVICE_ID = "".join(["{:02x}".format(b) for b in wlan.config("mac")])
+HOSTNAME = config.get("wifi", {}).get("hostname", "scorebox-unknown")
 
 # --- PIXEL MAPPING ---
 # 0-indexed LED numbers for each point.
@@ -86,6 +92,41 @@ def load_cache():
 
 
 # --- CORE FUNCTIONS (The Abstractions) ---
+
+
+def log_event(event_name, event_details=""):
+    """
+    Log an event to the remote API server.
+    event_name: Name of the event (e.g., "device_online", "goal_scored")
+    event_details: Optional additional details
+    """
+    url = f"{constants.API_BASE_URL}/api/log"
+
+    try:
+        payload = {
+            "deviceId": DEVICE_ID,
+            "hostname": HOSTNAME,
+            "eventName": event_name,
+            "eventDetails": event_details,
+        }
+
+        # Convert to JSON string manually (MicroPython may not have json.dumps)
+        import ujson
+
+        json_data = ujson.dumps(payload)
+
+        headers = {"Content-Type": "application/json"}
+        response = urequests.post(url, data=json_data, headers=headers)
+
+        if response.status_code == 201:
+            print(f"Logged event: {event_name}")
+        else:
+            print(f"Failed to log event: {response.status_code}")
+
+        response.close()
+    except Exception as e:
+        print(f"Error logging event: {e}")
+        # Don't crash if logging fails
 
 
 def scale_brightness(color, brightness_percent):
@@ -232,165 +273,64 @@ def manual_set_score(wild, opp):
 
 def check_network_score():
     """
-    Memory-safe function to find both team scores.
-    Streams the data instead of loading it all at once.
+    Simplified function to check team scores using our API server.
+    The API handles all the parsing and caching.
     Returns a tuple: (our_team_score, opponent_score)
     Returns (-1, -1) on network error
     Returns (-2, -2) if team not found
     """
-    url = "https://api-web.nhle.com/v1/score/now"
+    url = f"{constants.API_BASE_URL}/api/scores/{TEAM_ABBREV}"
     print(f"\nChecking {url} for score updates...")
 
-    # Track data for current game being parsed
-    away_team_abbrev = None
-    away_team_score = None
-    home_team_abbrev = None
-    home_team_score = None
-
-    # 1. Force cleanup before starting the heavy network op
-    gc.collect()
+    gc.collect()  # Clean up memory before network call
 
     try:
-        # stream=True is CRITICAL. It keeps the data on the network socket
-        # instead of downloading it all to RAM.
-        response = urequests.get(url, stream=True)
+        response = urequests.get(url)
 
-        # We will keep a "rolling window" of text to search through
-        buffer = ""
+        if response.status_code != 200:
+            print(f"API returned status {response.status_code}")
+            response.close()
+            return (-1, -1)
 
-        # Read the stream in small chunks
-        while True:
-            print("Processing stream chunk")
-            chunk = response.raw.read(constants.NETWORK_CHUNK_SIZE)
-            if not chunk:
-                break
+        # Parse JSON response
+        import ujson
 
-            # Decode chunk to string and add to buffer
-            try:
-                buffer += chunk.decode("utf-8")
-            except:
-                continue  # Skip decode errors (rare edge case)
-
-            # Keep buffer small to save RAM
-            # But keep enough overlap to catch data split across chunks
-            if len(buffer) > constants.NETWORK_BUFFER_SIZE:
-                buffer = buffer[-constants.NETWORK_BUFFER_SIZE :]
-
-            # print(f"Checking buffer {buffer}.")
-
-            # SEARCH LOGIC:
-            # Look for awayTeam section
-            if '"awayTeam"' in buffer and away_team_abbrev is None:
-                print("Found awayTeam section")
-                away_idx = buffer.find('"awayTeam"')
-                away_section = buffer[away_idx : away_idx + 400]
-
-                # Extract abbrev
-                if '"abbrev":"' in away_section:
-                    abbrev_idx = away_section.find('"abbrev":"')
-                    abbrev_start = abbrev_idx + len('"abbrev":"')
-                    abbrev_end = away_section.find('"', abbrev_start)
-                    away_team_abbrev = away_section[abbrev_start:abbrev_end]
-
-                # Extract score
-                if '"score":' in away_section:
-                    score_idx = away_section.find('"score":')
-                    score_part = away_section[score_idx + len('"score":') :]
-                    score_str = ""
-                    for char in score_part:
-                        if char.isdigit():
-                            score_str += char
-                        else:
-                            break
-                    if score_str:
-                        away_team_score = int(score_str)
-            # else:
-            # print(
-            #    f"could not find away team data and score in {buffer} and away_team_abbrev is {away_team_abbrev}"
-            # )
-
-            # Look for homeTeam section
-            if '"homeTeam"' in buffer and home_team_abbrev is None:
-                print("Found homeTeam section")
-
-                home_idx = buffer.find('"homeTeam"')
-                home_section = buffer[home_idx : home_idx + 400]
-
-                # Extract abbrev
-                if '"abbrev":"' in home_section:
-                    abbrev_idx = home_section.find('"abbrev":"')
-                    abbrev_start = abbrev_idx + len('"abbrev":"')
-                    abbrev_end = home_section.find('"', abbrev_start)
-                    home_team_abbrev = home_section[abbrev_start:abbrev_end]
-
-                # Extract score
-                if '"score":' in home_section:
-                    score_idx = home_section.find('"score":')
-                    score_part = home_section[score_idx + len('"score":') :]
-                    score_str = ""
-                    for char in score_part:
-                        if char.isdigit():
-                            score_str += char
-                        else:
-                            break
-                    if score_str:
-                        home_team_score = int(score_str)
-
-            # Check if we've reached the end of a game object ("}]}")
-            # This indicates we have all the data for this game
-            if "}]}" in buffer:
-                # Once we have both teams, check if one is our team
-                if (
-                    away_team_abbrev
-                    and home_team_abbrev
-                    and away_team_score is not None
-                    and home_team_score is not None
-                ):
-                    if away_team_abbrev == TEAM_ABBREV:
-                        # We're the away team
-                        print(
-                            f"Found {TEAM_ABBREV} as away team: {away_team_score}-{home_team_score}"
-                        )
-                        response.close()
-                        return (away_team_score, home_team_score)
-                    elif home_team_abbrev == TEAM_ABBREV:
-                        # We're the home team
-                        print(
-                            f"Found {TEAM_ABBREV} as home team: {home_team_score}-{away_team_score}"
-                        )
-                        response.close()
-                        return (home_team_score, away_team_score)
-                    else:
-                        # This game doesn't involve our team
-                        print(
-                            f"Found game: {away_team_abbrev} vs {home_team_abbrev} - not {TEAM_ABBREV}, continuing..."
-                        )
-
-                # Reset for next game - clear buffer and variables
-                end_game_idx = buffer.find("}]}")
-                if end_game_idx != -1:
-                    buffer = buffer[end_game_idx + 3 :]  # Skip past "}]}"
-
-                away_team_abbrev = None
-                away_team_score = None
-                home_team_abbrev = None
-                home_team_score = None
-
+        data = ujson.loads(response.text)
         response.close()
+
+        # Check if team was found
+        if "status" in data:
+            if data["status"] == "not found":
+                print(f"Team {TEAM_ABBREV} not playing")
+                return (-2, -2)
+
+        # Extract scores
+        if "us" in data and "them" in data:
+            us_score = data["us"]
+            them_score = data["them"]
+            print(f"Retrieved scores: {TEAM_ABBREV} {us_score} - {them_score} OPP")
+            return (us_score, them_score)
+
+        print("Unexpected API response format")
+        return (-1, -1)
 
     except Exception as e:
         print(f"Network error: {e}")
         return (-1, -1)
 
-    # If we went through the whole stream and didn't find our team
-    return (-2, -2)
-
-    pass
-
 
 # --- MAIN EXECUTION ---
 load_cache()
 draw_scoreboard()
+
+# Log device startup
+try:
+    log_event(
+        "device_online",
+        f"Team: {TEAM_ABBREV}, Score: {current_wild_score}-{current_opp_score}",
+    )
+except:
+    print("Failed to log device startup (continuing anyway)")
 
 # Loop
 while True:
@@ -430,12 +370,28 @@ while True:
                     current_opp_score = new_opp_score
                     save_cache()
                     draw_scoreboard()
+                    # Log the goal
+                    try:
+                        log_event(
+                            "goal_scored",
+                            f"{TEAM_ABBREV} goal! Score: {current_wild_score}-{current_opp_score}",
+                        )
+                    except:
+                        print("Failed to log goal event")
                 elif new_opp_score > current_opp_score:
                     trigger_goal(is_wild_goal=False)
                     current_wild_score = new_wild_score
                     current_opp_score = new_opp_score
                     save_cache()
                     draw_scoreboard()
+                    # Log opponent goal
+                    try:
+                        log_event(
+                            "goal_scored",
+                            f"Opponent goal. Score: {current_wild_score}-{current_opp_score}",
+                        )
+                    except:
+                        print("Failed to log goal event")
                 else:
                     print("No score change detected.")
 

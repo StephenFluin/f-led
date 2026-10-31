@@ -1,0 +1,35 @@
+{
+  "name": "scorebox-data-api",
+  "version": "1.0.0",
+  "description": "API server for NHL scorebox data and device logging",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "docker:build": "docker build -t scorebox-data-api .",
+    "docker:run": "docker run -p 8484:8484 scorebox-data-api"
+  },
+  "keywords": [
+    "nhl",
+    "scoreboard",
+    "esp32"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^5.0.1",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "tsx": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

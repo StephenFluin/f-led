@@ -8,7 +8,7 @@ A network-connected ESP32 device that monitors sports API endpoints and displays
 - **Access Point Fallback**: Automatically creates a WiFi hotspot when unable to connect
 - **Loading Indicator**: Blue LED spinner at 5% brightness during WiFi connection
 - **Persistent Configuration**: Saves WiFi credentials and settings to device storage
-- **Runtime Configuration Server**: Web interface available on port 8080 when connected to WiFi
+- **Runtime Configuration Server**: Web interface available on port 8484 when connected to WiFi
 - **Live Score Display**: Shows current game score on LED matrix
 - **Goal Celebrations**: Visual and audio effects when goals are scored
 - **Power Button Sleep Mode**: Press button to turn off LEDs and disconnect WiFi to save power
@@ -50,7 +50,7 @@ If you need to change WiFi settings or device configuration:
 **Option 1: Web Interface (Recommended)**
 
 1. Find your device's IP address (check your router or console output)
-2. Open browser to: `http://[device-ip]:8080`
+2. Open browser to: `http://[device-ip]:8484`
 3. Adjust settings as needed
 4. Click "Save & Restart"
 
@@ -62,11 +62,11 @@ If you need to change WiFi settings or device configuration:
 
 ## Runtime Configuration
 
-When the device successfully connects to WiFi, a web-based configuration server automatically starts on **port 8080**.
+When the device successfully connects to WiFi, a web-based configuration server automatically starts on **port 8484**.
 
 **Access the Configuration Interface:**
 
-- URL: `http://[device-ip]:8080`
+- URL: `http://[device-ip]:8484`
 - The IP address is displayed in the console output during boot
 - Check your router's connected devices list if needed
 
@@ -140,7 +140,7 @@ Caches the last known score to maintain state across reboots.
 - `main.py`: Main application logic for score monitoring and LED control
 - `wifi_manager.py`: WiFi management with AP fallback and web server
 - `config.py`: Configuration file management
-- `config_server.py`: Runtime configuration web server (port 8080)
+- `config_server.py`: Runtime configuration web server (port 8484)
 - `power_manager.py`: Power button handling and sleep mode
 - `template_loader.py`: HTML template loading and rendering
 
@@ -199,6 +199,48 @@ To modify the code:
 - Try pressing and holding power button for 1 second
 - Power cycle the device (unplug and plug back in)
 - Check that GPIO 0 button is properly connected
+
+## API Server (New!)
+
+This project now includes a cloud-based API server that simplifies score fetching and enables device monitoring.
+
+### Features
+
+- **Simplified Score API**: Pre-parsed NHL scores, reducing ESP32 memory usage
+- **Event Logging**: Track device online events and goals across all your devices
+- **Smart Caching**: 3-second cache reduces NHL API calls
+- **Cloud or Local**: Run locally for development or deploy to Google Cloud Run
+
+### Quick Start
+
+See **[API_SUMMARY.md](API_SUMMARY.md)** for complete setup instructions.
+
+**Deploy Server:**
+
+```bash
+cd server
+npm install
+npm run dev  # Local development
+
+# Or deploy to Cloud Run:
+gcloud run deploy scorebox-data --source . --region us-central1
+```
+
+**Configure ESP32:**
+Edit `constants.py`:
+
+```python
+DEBUG_MODE = False  # Production: uses https://scorebox-data.fluin.io
+# DEBUG_MODE = True  # Local: uses http://YOUR_IP:8484
+```
+
+### Documentation
+
+- **[API_SUMMARY.md](API_SUMMARY.md)** - Overview and quick start
+- **[ESP32_API_INTEGRATION.md](ESP32_API_INTEGRATION.md)** - ESP32 integration details
+- **[server/README.md](server/README.md)** - Server documentation
+- **[server/DEPLOYMENT.md](server/DEPLOYMENT.md)** - Deployment guide
+- **[server/QUICKREF.md](server/QUICKREF.md)** - API quick reference
 
 ## License
 

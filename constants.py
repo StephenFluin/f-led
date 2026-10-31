@@ -58,3 +58,10 @@ WIFI_CHECK_INTERVAL_SEC = 0.1  # Check every 0.1 seconds
 CACHE_FILE = "score.txt"
 CONFIG_FILE = "config.json"
 TEMPLATE_DIR = "/www/"
+
+# API Configuration
+# Set DEBUG_MODE = True to use local network IP, False for production domain
+DEBUG_MODE = False  # Change to True for local testing
+API_BASE_URL = (
+    "http://192.168.1.100:8484" if DEBUG_MODE else "https://scorebox-data.fluin.io"
+)
